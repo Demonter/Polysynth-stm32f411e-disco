@@ -1,4 +1,5 @@
 #include "Voice.h"
+#include "LogBuffer.h"
 
 
 void Voice::setEnvelope(float attack, float decay, float sustain, float release) {
@@ -38,6 +39,13 @@ float Voice::nextSample() {
     float sample = oscillator.nextSample();
     float env = envelope.nextSample();
     float output = sample * env;
+
+    static int log_cnt;
+    if (!(log_cnt++ % 100000)) {
+    	LogBuffer::info("Voice sample: %.3f\r\n", sample);
+    	LogBuffer::info("Voice env: %.3f\r\n",env);
+    	LogBuffer::info("Voice output: %.3f\r\n",output);
+    }
 
     if (!envelope.isActive()) {
         active = false;

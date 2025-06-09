@@ -12,6 +12,7 @@ public:
 
     ADSR();
 
+//    void init(float a, float d, float s, float r);
     void setSampleRate(float rate);
     void setAttackTime(float seconds);
     void setDecayTime(float seconds);
@@ -30,9 +31,9 @@ private:
 
     float sampleRate = 48000.0f;
 
-    float attackRate = 0.0f;
-    float decayRate = 0.0f;
-    float releaseRate = 0.0f;
+    float attackRate = 0.001f;
+    float decayRate = 0.001f;
+    float releaseRate = 0.002f;
 
     float attackTime = 0.01f;
     float decayTime = 0.1f;

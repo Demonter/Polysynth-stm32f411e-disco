@@ -1,9 +1,11 @@
 #include "ADSR.h"
+#include "LogBuffer.h"
+#include "AudioConfig.h"
 
 ADSR::ADSR() {}
 
 void ADSR::setSampleRate(float rate) {
-    sampleRate = rate;
+    sampleRate = SAMPLE_RATE;
     setAttackTime(attackTime);
     setDecayTime(decayTime);
     setReleaseTime(releaseTime);
@@ -43,6 +45,10 @@ void ADSR::reset() {
 }
 
 float ADSR::nextSample() {
+    static int log_cnt;
+    if (!(log_cnt++ % 100000)) {
+        LogBuffer::info("ADSR state: %d, level: %.3f\r\n", static_cast<int>(state), level);
+    }
     switch (state) {
         case State::Idle:
             return 0.0f;

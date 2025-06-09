@@ -2,6 +2,7 @@
 #include "DDSOscillator.h"
 #include "MidiInput.h"
 #include "Voice.h"
+#include "LogBuffer.h"
 
 extern I2C_HandleTypeDef hi2c1;
 extern I2S_HandleTypeDef hi2s3;
@@ -54,36 +55,39 @@ void Synthesizer::startAudioDMA() {
 }
 
 void Synthesizer::update() {
-    extern MidiInput midi;
-    midi.processDma();
+	extern MidiInput midi;
+	midi.processDma();
 
-    // Enable smoothing once (or in constructor if you prefer)
-    normalizer.enableSmoothing(true);
+	// Enable smoothing once (or in constructor if you prefer)
+	normalizer.enableSmoothing(true);
 
-    for (size_t i = 0; i < AUDIO_BUFFER_SIZE; i += 2) {
-        float sum = 0.0f;
-        int activeVoices = 0;
+	for (size_t i = 0; i < AUDIO_BUFFER_SIZE; i += 2) {
+		float sum = 0.0f;
+		int activeVoices = 0;
 
-        for (int v = 0; v < MAX_VOICES; ++v) {
-            if (voices[v].isActive()) {
-                sum += static_cast<float>(voices[v].nextSample()) / 32767.0f;
-                activeVoices++;
-            }
-        }
+		for (int v = 0; v < MAX_VOICES; ++v) {
+			if (voices[v].isActive()) {
+				sum += static_cast<float>(voices[v].nextSample()) / 32767.0f;
+				activeVoices++;
+			}
+		}
 
-        // Only calculate float division once per frame
-        float targetGain = 1.0f;
-        if (activeVoices > 0) {
-            targetGain = 1.0f / static_cast<float>(activeVoices);
-        }
+		// Only calculate float division once per frame
+		float targetGain = 1.0f;
+		if (activeVoices > 0) {
+			targetGain = 1.0f / static_cast<float>(activeVoices);
+		}
 
-        // Apply smoothed target gain
-        normalizer.setTargetGain(targetGain);
+		// Apply smoothed target gain
+		normalizer.setTargetGain(targetGain);
 
-        int16_t sample = normalizer.normalize(sum);
-        audioBuffer[i] = sample;
-        audioBuffer[i + 1] = sample;  // Stereo identical output
-    }
+
+		int16_t sample = normalizer.normalize(sum); // remove normalizer from the pipeline TODO: add compressor
+		//        int16_t sample = static_cast<int16_t>(sum * 0.25f * 32767.0f);
+
+		audioBuffer[i] = sample;
+		audioBuffer[i + 1] = sample;  // Stereo identical output
+	}
 }
 
 void Synthesizer::noteOn(uint8_t note, uint8_t velocity) {	//TODO: create proper logic (circular buffer)!!!
@@ -126,22 +130,23 @@ void Synthesizer::fillBufferRange(size_t offset) {
     midi.processDma();
 
     for (size_t i = 0; i < AUDIO_BUFFER_SIZE / 2; i += 2) {
-        float sum = 0.0f;
+        double sum = 0.0f;
         int activeVoices = 0;
 
         for (int v = 0; v < MAX_VOICES; ++v) {
             if (voices[v].isActive()) {
-                sum += static_cast<float>(voices[v].nextSample()) / 32767.0f;
+                sum += static_cast<float>(voices[v].nextSample());
                 activeVoices++;
             }
         }
+        int16_t sample = static_cast<int16_t>(sum * 0.25f);
 
-        if (activeVoices > 0)
-            normalizer.setGain(1.0f / static_cast<float>(activeVoices));
-        else
-            normalizer.setGain(1.0f);
-
-        int16_t sample = normalizer.normalize(sum);
+        static int log_cnt;
+        if (!(log_cnt++ % 100000)) {
+        	LogBuffer::info("Synth output (float sum): %.3f\r\n", sum);
+        	LogBuffer::info("Synth output: %d\r\n",sample);
+        	LogBuffer::info("Active voices: %d\r\n",activeVoices);
+        }
         audioBuffer[offset + i] = sample;
         audioBuffer[offset + i + 1] = sample;
     }
